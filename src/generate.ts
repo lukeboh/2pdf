@@ -24,6 +24,17 @@ const md = new MarkdownIt({
   }
 });
 
+const fence = md.renderer.rules.fence;
+md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const info = token.info ? md.utils.unescapeAll(token.info).trim() : "";
+  if (info === "mermaid") {
+    const content = token.content;
+    return `<div class=\"mermaid\">${md.utils.escapeHtml(content)}</div>`;
+  }
+  return fence ? fence(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options);
+};
+
 const mimeByExtension: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -215,6 +226,7 @@ const buildHtml = async (
   .doc-content pre code { display: block; font-family: "Courier New", monospace; }
   .doc-content a { color: #0b57d0; text-decoration: underline; }
   .hljs { background: #f5f5f5; color: #111; }
+  .mermaid { margin: 12px 0; }
 </style>
 </head>
 <body>
@@ -250,6 +262,7 @@ export const generatePdfFromMarkdownDir = async (
   const tocHtml = renderToc(node);
   const sectionsHtml = await buildSections(rootDir, files, logger);
   const html = await buildHtml(rootName, tocHtml, sectionsHtml);
+  const hasMermaid = html.includes("class=\"mermaid\"");
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -260,6 +273,17 @@ export const generatePdfFromMarkdownDir = async (
   page.setDefaultNavigationTimeout(0);
   page.setDefaultTimeout(0);
   await page.setContent(html, { waitUntil: "load", timeout: 0 });
+
+  if (hasMermaid) {
+    await page.addScriptTag({ path: require.resolve("mermaid/dist/mermaid.min.js") });
+    await page.evaluate(async () => {
+      // @ts-ignore
+      window.mermaid.initialize({ startOnLoad: false });
+      // @ts-ignore
+      await window.mermaid.run({ querySelector: ".mermaid" });
+    });
+  }
+
   await page.pdf({
     path: outputPath,
     format: "A4",

@@ -15,12 +15,12 @@
     "commander": "^12.1.0",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0",
+    "mermaid": "^10.9.0",
     "pino": "^9.3.2",
     "pino-pretty": "^11.2.2",
     "puppeteer": "^24.15.0"
   },
   "devDependencies": {
-    "@types/highlight.js": "^10.1.0",
     "@types/markdown-it": "^13.0.8",
     "@types/node": "^20.14.9",
     "ts-node": "^10.9.2",

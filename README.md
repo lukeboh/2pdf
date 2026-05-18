@@ -49,6 +49,7 @@ node dist/index.js --in ../documentacao-sistema --verbose
 - Imagens responsivas (largura máxima da página).
 - Destaque de sintaxe com highlight.js (auto-detect).
 - Links clicáveis dentro do documento.
+- Diagramas Mermaid (blocos ```mermaid) renderizados no HTML antes do PDF (sem CDN externa).
 
 ## Comportamento
 
