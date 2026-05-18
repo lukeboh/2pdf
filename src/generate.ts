@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import MarkdownIt from "markdown-it";
 import hljs from "highlight.js";
+import plantumlEncoder from "plantuml-encoder";
 import puppeteer from "puppeteer";
 import { Logger } from "pino";
 
@@ -28,10 +29,19 @@ const fence = md.renderer.rules.fence;
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const token = tokens[idx];
   const info = token.info ? md.utils.unescapeAll(token.info).trim() : "";
+
   if (info === "mermaid") {
     const content = token.content;
     return `<div class=\"mermaid\">${md.utils.escapeHtml(content)}</div>`;
   }
+
+  if (info === "plantuml") {
+    const content = token.content;
+    const encoded = plantumlEncoder.encode(content);
+    const src = `https://www.plantuml.com/plantuml/svg/${encoded}`;
+    return `<img class=\"plantuml\" src=\"${src}\" alt=\"PlantUML\" />`;
+  }
+
   return fence ? fence(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options);
 };
 
@@ -222,6 +232,7 @@ const buildHtml = async (
   .doc-content table { border-collapse: collapse; width: 100%; }
   .doc-content th, .doc-content td { border: 1px solid #000; padding: 6px 8px; }
   .doc-content img { max-width: 100%; height: auto; }
+  .doc-content img.plantuml { display: block; margin: 12px 0; }
   .doc-content pre { background: #f5f5f5; padding: 12px; overflow: auto; }
   .doc-content pre code { display: block; font-family: "Courier New", monospace; }
   .doc-content a { color: #0b57d0; text-decoration: underline; }

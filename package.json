@@ -18,6 +18,7 @@
     "mermaid": "^10.9.0",
     "pino": "^9.3.2",
     "pino-pretty": "^11.2.2",
+    "plantuml-encoder": "^1.4.0",
     "puppeteer": "^24.15.0"
   },
   "devDependencies": {
