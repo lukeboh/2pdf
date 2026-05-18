@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import MarkdownIt from "markdown-it";
+import hljs from "highlight.js";
 import puppeteer from "puppeteer";
 import { Logger } from "pino";
 
@@ -14,8 +15,69 @@ export type TreeNode = {
 const md = new MarkdownIt({
   html: true,
   linkify: true,
-  typographer: true
+  typographer: true,
+  highlight: (code, language) => {
+    if (language && hljs.getLanguage(language)) {
+      return hljs.highlight(code, { language }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  }
 });
+
+const mimeByExtension: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp"
+};
+
+const isExternalLink = (src: string) =>
+  /^(https?:|data:|file:|mailto:|#)/i.test(src);
+
+const toDataUri = (content: Buffer, mime: string) => {
+  const base64 = content.toString("base64");
+  return `data:${mime};base64,${base64}`;
+};
+
+const embedImagesAsDataUri = async (tokens: MarkdownIt.Token[], filePath: string) => {
+  for (const token of tokens) {
+    if (token.type === "image") {
+      const src = token.attrGet("src");
+      if (!src || isExternalLink(src)) {
+        continue;
+      }
+
+      const absoluteImagePath = path.resolve(path.dirname(filePath), src);
+      const ext = path.extname(absoluteImagePath).toLowerCase();
+      const mime = mimeByExtension[ext];
+
+      if (!mime) {
+        continue;
+      }
+
+      try {
+        const content = await fs.readFile(absoluteImagePath);
+        token.attrSet("src", toDataUri(content, mime));
+      } catch {
+        continue;
+      }
+    }
+
+    if (token.children && token.children.length > 0) {
+      await embedImagesAsDataUri(token.children, filePath);
+    }
+  }
+};
+
+const renderMarkdownWithImages = async (content: string, filePath: string) => {
+  const env = { filePath };
+  const tokens = md.parse(content, env);
+  await embedImagesAsDataUri(tokens, filePath);
+  return md.renderer.render(tokens, md.options, env);
+};
 
 const slugify = (value: string): string =>
   value
@@ -110,7 +172,7 @@ const buildSections = async (
     const content = await fs.readFile(absolutePath, "utf8");
     const title = file.name.replace(/\.md$/i, "");
     const anchor = slugify(file.relPath);
-    const htmlContent = md.render(content);
+    const htmlContent = await renderMarkdownWithImages(content, absolutePath);
 
     sections.push(
       `<section class=\"doc-section\">` +
@@ -146,8 +208,13 @@ const buildHtml = async (
   .doc-section { page-break-before: always; }
   .doc-section h1 { font-size: 28px; margin-bottom: 8px; }
   .doc-content h2 { margin-top: 20px; }
+  .doc-content table { border-collapse: collapse; width: 100%; }
+  .doc-content th, .doc-content td { border: 1px solid #000; padding: 6px 8px; }
+  .doc-content img { max-width: 100%; height: auto; }
   .doc-content pre { background: #f5f5f5; padding: 12px; overflow: auto; }
-  .doc-content code { font-family: "Courier New", monospace; }
+  .doc-content pre code { display: block; font-family: "Courier New", monospace; }
+  .doc-content a { color: #0b57d0; text-decoration: underline; }
+  .hljs { background: #f5f5f5; color: #111; }
 </style>
 </head>
 <body>

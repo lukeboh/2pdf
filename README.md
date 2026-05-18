@@ -43,6 +43,13 @@ node dist/index.js --in ../documentacao-sistema --verbose
 - INFO: fim do processo com o caminho do PDF gerado.
 - INFO: tempo total de execução.
 
+## Estilo do PDF
+
+- Tabelas com borda preta de 1px.
+- Imagens responsivas (largura máxima da página).
+- Destaque de sintaxe com highlight.js (auto-detect).
+- Links clicáveis dentro do documento.
+
 ## Comportamento
 
 - Varre o diretório de forma recursiva.
