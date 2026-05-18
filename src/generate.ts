@@ -209,7 +209,8 @@ const buildSections = async (
 const buildHtml = async (
   rootName: string,
   tocHtml: string,
-  sectionsHtml: string
+  sectionsHtml: string,
+  pageMargins: string
 ) => {
   return `<!doctype html>
 <html lang=\"pt-BR\">
@@ -217,7 +218,7 @@ const buildHtml = async (
 <meta charset=\"utf-8\" />
 <title>${rootName}</title>
 <style>
-  @page { margin: 24mm 18mm; }
+  @page { margin: ${pageMargins}; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111; }
   .cover { display: flex; align-items: center; justify-content: center; height: 80vh; }
   .cover h1 { font-size: 48px; }
@@ -255,10 +256,21 @@ const buildHtml = async (
 </html>`;
 };
 
+export type PdfOrientation = "portrait" | "landscape";
+export type PdfMargins = "narrow" | "normal" | "wide";
+
+const marginByPreset: Record<PdfMargins, string> = {
+  narrow: "12mm 10mm",
+  normal: "24mm 18mm",
+  wide: "32mm 24mm"
+};
+
 export const generatePdfFromMarkdownDir = async (
   rootDir: string,
   outputPath: string,
-  logger: Logger
+  logger: Logger,
+  orientation: PdfOrientation,
+  margins: PdfMargins
 ) => {
   const startedAt = Date.now();
   const { node, files } = await buildTree(rootDir, rootDir);
@@ -272,7 +284,8 @@ export const generatePdfFromMarkdownDir = async (
   const rootName = path.basename(rootDir);
   const tocHtml = renderToc(node);
   const sectionsHtml = await buildSections(rootDir, files, logger);
-  const html = await buildHtml(rootName, tocHtml, sectionsHtml);
+  const pageMargins = marginByPreset[margins];
+  const html = await buildHtml(rootName, tocHtml, sectionsHtml, pageMargins);
   const hasMermaid = html.includes("class=\"mermaid\"");
 
   const browser = await puppeteer.launch({
@@ -298,6 +311,7 @@ export const generatePdfFromMarkdownDir = async (
   await page.pdf({
     path: outputPath,
     format: "A4",
+    landscape: orientation === "landscape",
     printBackground: true
   });
   await browser.close();

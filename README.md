@@ -35,6 +35,12 @@ Para habilitar logs em nível DEBUG:
 node dist/index.js --in ../documentacao-sistema --verbose
 ```
 
+Para orientar o PDF e ajustar margens:
+
+```bash
+node dist/index.js --in ../documentacao-sistema --orientation landscape --margins wide
+```
+
 ## Logs
 
 - INFO: início do processo com a pasta de entrada.
@@ -42,6 +48,11 @@ node dist/index.js --in ../documentacao-sistema --verbose
 - DEBUG: cada arquivo lido.
 - INFO: fim do processo com o caminho do PDF gerado.
 - INFO: tempo total de execução.
+
+## Opções de PDF
+
+- `--orientation`: `portrait` (padrão) ou `landscape`.
+- `--margins`: `narrow`, `normal` (padrão) ou `wide`.
 
 ## Estilo do PDF
 
