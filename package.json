@@ -1,0 +1,27 @@
+{
+  "name": "md-dir-to-pdf",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "md-dir-to-pdf": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "markdown-it": "^14.1.0",
+    "pino": "^9.3.2",
+    "pino-pretty": "^11.2.2",
+    "puppeteer": "^24.15.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^13.0.8",
+    "@types/node": "^20.14.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}
