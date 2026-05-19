@@ -56,7 +56,7 @@ const mimeByExtension: Record<string, string> = {
 };
 
 const isExternalLink = (src: string) =>
-  /^(https?:|data:|file:|mailto:|#)/i.test(src);
+  /^(https?:|data:|file:|mailto:)/i.test(src);
 
 const toDataUri = (content: Buffer, mime: string) => {
   const base64 = content.toString("base64");
@@ -67,7 +67,7 @@ const embedImagesAsDataUri = async (tokens: MarkdownIt.Token[], filePath: string
   for (const token of tokens) {
     if (token.type === "image") {
       const src = token.attrGet("src");
-      if (!src || isExternalLink(src)) {
+      if (!src || src.startsWith("#") || isExternalLink(src)) {
         continue;
       }
 
@@ -93,9 +93,75 @@ const embedImagesAsDataUri = async (tokens: MarkdownIt.Token[], filePath: string
   }
 };
 
-const renderMarkdownWithImages = async (content: string, filePath: string) => {
+const getHeadingText = (tokens: MarkdownIt.Token[], idx: number) => {
+  const next = tokens[idx + 1];
+  if (!next || next.type !== "inline" || !next.children) {
+    return "";
+  }
+  return next.children
+    .filter((child) => child.type === "text" || child.type === "code_inline")
+    .map((child) => child.content)
+    .join(" ")
+    .trim();
+};
+
+const normalizeInternalLinks = (
+  tokens: MarkdownIt.Token[],
+  rootDir: string,
+  currentFilePath: string
+) => {
+  const currentRel = path.relative(rootDir, currentFilePath);
+  const currentPrefix = slugify(currentRel);
+
+  for (const token of tokens) {
+    if (token.type === "link_open") {
+      const href = token.attrGet("href");
+      if (href) {
+        if (href.startsWith("#")) {
+          const target = href.slice(1);
+          const normalized = slugify(target);
+          token.attrSet("href", `#${currentPrefix}-${normalized}`);
+        } else if (!isExternalLink(href)) {
+          const [linkPath, hash] = href.split("#");
+          const resolvedPath = path.resolve(path.dirname(currentFilePath), linkPath);
+          const rel = path.relative(rootDir, resolvedPath);
+          const prefix = slugify(rel);
+          if (hash) {
+            token.attrSet("href", `#${prefix}-${slugify(hash)}`);
+          } else {
+            token.attrSet("href", `#${prefix}`);
+          }
+        }
+      }
+    }
+
+    if (token.children && token.children.length > 0) {
+      normalizeInternalLinks(token.children, rootDir, currentFilePath);
+    }
+  }
+};
+
+const renderMarkdownWithImages = async (
+  content: string,
+  filePath: string,
+  rootDir: string
+) => {
   const env = { filePath };
   const tokens = md.parse(content, env);
+  const relPath = path.relative(rootDir, filePath);
+  const prefix = slugify(relPath);
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token.type === "heading_open") {
+      const text = getHeadingText(tokens, i);
+      if (text) {
+        token.attrSet("id", `${prefix}-${slugify(text)}`);
+      }
+    }
+  }
+
+  normalizeInternalLinks(tokens, rootDir, filePath);
   await embedImagesAsDataUri(tokens, filePath);
   return md.renderer.render(tokens, md.options, env);
 };
@@ -103,7 +169,7 @@ const renderMarkdownWithImages = async (content: string, filePath: string) => {
 const slugify = (value: string): string =>
   value
     .toLowerCase()
-    .replace(/\\/g, "-")
+    .replace(/[\\/]/g, "-")
     .replace(/[^a-z0-9\u00C0-\u024F-_]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
@@ -193,11 +259,12 @@ const buildSections = async (
     const content = await fs.readFile(absolutePath, "utf8");
     const title = file.name.replace(/\.md$/i, "");
     const anchor = slugify(file.relPath);
-    const htmlContent = await renderMarkdownWithImages(content, absolutePath);
+    const htmlContent = await renderMarkdownWithImages(content, absolutePath, rootDir);
 
     sections.push(
-      `<section class=\"doc-section\">` +
-        `<h1 id=\"${anchor}\">${title}</h1>` +
+      `<section class=\"doc-section\" id=\"${anchor}\">` +
+        `<a id=\"${anchor}\" name=\"${anchor}\"></a>` +
+        `<h1>${title}</h1>` +
         `<div class=\"doc-content\">${htmlContent}</div>` +
       `</section>`
     );
@@ -226,7 +293,7 @@ const buildHtml = async (
   .toc h1 { font-size: 32px; margin-bottom: 12px; }
   .toc-list { list-style: none; padding-left: 12px; }
   .toc-dir > span { font-weight: bold; display: block; margin-top: 8px; }
-  .toc-file a { text-decoration: none; color: #111; }
+  .toc-file a { color: #0b57d0; text-decoration: underline; font-weight: 600; }
   .doc-section { page-break-before: always; }
   .doc-section h1 { font-size: 28px; margin-bottom: 8px; }
   .doc-content h2 { margin-top: 20px; }
@@ -236,7 +303,7 @@ const buildHtml = async (
   .doc-content img.plantuml { display: block; margin: 12px 0; }
   .doc-content pre { background: #f5f5f5; padding: 12px; overflow: auto; }
   .doc-content pre code { display: block; font-family: "Courier New", monospace; }
-  .doc-content a { color: #0b57d0; text-decoration: underline; }
+  .doc-content a { color: #0b57d0; text-decoration: underline; font-weight: 600; }
   .hljs { background: #f5f5f5; color: #111; }
   .mermaid { margin: 12px 0; }
 </style>
