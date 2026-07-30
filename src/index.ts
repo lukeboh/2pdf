@@ -3,7 +3,7 @@ import { Command } from "commander";
 import path from "path";
 import fs from "fs";
 import pino from "pino";
-import { generatePdfFromMarkdownDir } from "./generate";
+import { generatePdfFromMarkdownDir, getFormattedTimestamp } from "./generate";
 
 const program = new Command();
 
@@ -49,9 +49,15 @@ if (!fs.existsSync(absoluteDir) || !fs.statSync(absoluteDir).isDirectory()) {
 }
 
 const baseName = path.basename(absoluteDir);
-const outputPath = options.out
-  ? path.resolve(process.cwd(), options.out)
-  : path.resolve(process.cwd(), `${baseName}.pdf`);
+const timestamp = getFormattedTimestamp();
+
+let outputPath: string;
+if (options.out) {
+  const parsed = path.parse(options.out);
+  outputPath = path.resolve(process.cwd(), `${parsed.name}-${timestamp}${parsed.ext || ".pdf"}`);
+} else {
+  outputPath = path.resolve(process.cwd(), `${baseName}-${timestamp}.pdf`);
+}
 
 logger.info(`Início do processo a partir da pasta ${baseName}`);
 
@@ -70,7 +76,8 @@ generatePdfFromMarkdownDir(
   outputPath,
   logger,
   options.orientation,
-  options.margins
+  options.margins,
+  timestamp
 )
   .then(() => {
     logger.info(`Fim do processo: ${outputPath}`);

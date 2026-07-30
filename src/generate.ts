@@ -273,11 +273,22 @@ const buildSections = async (
   return sections.join("\n");
 };
 
+export const getFormattedTimestamp = (date: Date = new Date()): string => {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}-${hours}-${minutes}`;
+};
+
 const buildHtml = async (
   rootName: string,
   tocHtml: string,
   sectionsHtml: string,
-  pageMargins: string
+  pageMargins: string,
+  timestamp: string
 ) => {
   return `<!doctype html>
 <html lang=\"pt-BR\">
@@ -287,8 +298,9 @@ const buildHtml = async (
 <style>
   @page { margin: ${pageMargins}; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111; }
-  .cover { display: flex; align-items: center; justify-content: center; height: 80vh; }
-  .cover h1 { font-size: 48px; }
+  .cover { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; }
+  .cover h1 { font-size: 48px; margin-bottom: 16px; }
+  .cover .timestamp { font-size: 18px; color: #555; font-weight: 500; margin-top: 12px; }
   .page-break { page-break-after: always; }
   .toc h1 { font-size: 32px; margin-bottom: 12px; }
   .toc-list { list-style: none; padding-left: 12px; }
@@ -311,6 +323,7 @@ const buildHtml = async (
 <body>
   <section class=\"cover page-break\">
     <h1>${rootName}</h1>
+    <p class=\"timestamp\">${timestamp}</p>
   </section>
 
   <section class=\"toc page-break\">
@@ -337,9 +350,11 @@ export const generatePdfFromMarkdownDir = async (
   outputPath: string,
   logger: Logger,
   orientation: PdfOrientation,
-  margins: PdfMargins
+  margins: PdfMargins,
+  timestamp?: string
 ) => {
   const startedAt = Date.now();
+  const formattedTimestamp = timestamp || getFormattedTimestamp();
   const { node, files } = await buildTree(rootDir, rootDir);
 
   if (files.length === 0) {
@@ -352,13 +367,15 @@ export const generatePdfFromMarkdownDir = async (
   const tocHtml = renderToc(node);
   const sectionsHtml = await buildSections(rootDir, files, logger);
   const pageMargins = marginByPreset[margins];
-  const html = await buildHtml(rootName, tocHtml, sectionsHtml, pageMargins);
+  const html = await buildHtml(rootName, tocHtml, sectionsHtml, pageMargins, formattedTimestamp);
   const hasMermaid = html.includes("class=\"mermaid\"");
 
   const browser = await puppeteer.launch({
     headless: true,
     timeout: 0,
-    protocolTimeout: 0
+    protocolTimeout: 0,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
   });
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(0);
